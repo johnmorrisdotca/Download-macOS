@@ -25,11 +25,18 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 180
     steps:
-      - name: Fetch Sonoma 14.4.1 from Apple
+      - name: Download and verify the archived Apple installer
         shell: bash
         run: |
           set -euo pipefail
-          sudo softwareupdate --fetch-full-installer --full-installer-version 14.4.1
+          PKG="$RUNNER_TEMP/InstallAssistant.pkg"
+          curl --fail --location --retry 5 --retry-all-errors --continue-at - \
+            --output "$PKG" \
+            'https://archive.org/download/macOS-23E224-InstallAssistant/InstallAssistant.pkg'
+          echo 'b45705c9a985cfd05990266b59ce291b84df222a  '"$PKG" | shasum -a 1 -c -
+          pkgutil --check-signature "$PKG"
+          sudo installer -pkg "$PKG" -target /
+          rm "$PKG"
 
       - name: Verify the requested installer
         shell: bash
