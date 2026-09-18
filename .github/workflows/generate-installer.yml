@@ -1,0 +1,55 @@
+name: Generate macOS Installer
+run-name: Sonoma 14.4.1 (23E224) ZIP
+on:
+  workflow_dispatch:
+    inputs:
+      macos_version:
+        description: macOS version
+        type: choice
+        required: true
+        options:
+          - Sonoma 14.4.1 (23E224)
+      file:
+        description: Output format
+        type: choice
+        required: true
+        options:
+          - ZIP
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - name: Download Sonoma 14.4.1 from Apple
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --connect-timeout 30 --output "$RUNNER_TEMP/InstallAssistant.pkg" 'https://swcdn.apple.com/content/downloads/04/13/052-77516-A_4P7VY083DT/83qy3989rsnylxagdmim3owwjdtc33zfe4/InstallAssistant.pkg'
+          pkgutil --check-signature "$RUNNER_TEMP/InstallAssistant.pkg" | tee "$RUNNER_TEMP/signature.txt"
+          grep -q 'Software Update' "$RUNNER_TEMP/signature.txt"
+          grep -q 'Apple Root CA' "$RUNNER_TEMP/signature.txt"
+      - name: Extract installer application
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo installer -pkg "$RUNNER_TEMP/InstallAssistant.pkg" -target /
+          test -x '/Applications/Install macOS Sonoma.app/Contents/Resources/createinstallmedia'
+          rm "$RUNNER_TEMP/InstallAssistant.pkg"
+      - name: Package ZIP preserving application metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/output"
+          ditto -c -k --sequesterRsrc --keepParent '/Applications/Install macOS Sonoma.app' "$RUNNER_TEMP/output/macOS-Sonoma-14.4.1-23E224.zip"
+          cd "$RUNNER_TEMP/output"
+          shasum -a 256 macOS-Sonoma-14.4.1-23E224.zip > SHA256SUMS.txt
+      - name: Upload installer ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Sonoma-14.4.1-23E224-ZIP
+          path: ${{ runner.temp }}/output/*
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
