@@ -1,5 +1,6 @@
 name: Generate macOS Installer
 run-name: Sonoma 14.4.1 (23E224) ZIP
+
 on:
   workflow_dispatch:
     inputs:
@@ -15,41 +16,126 @@ on:
         required: true
         options:
           - ZIP
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: macos-15-intel
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
-      - name: Download Sonoma 14.4.1 from Apple
+      - name: Fetch Sonoma 14.4.1 from Apple
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --connect-timeout 30 --output "$RUNNER_TEMP/InstallAssistant.pkg" 'https://swcdn.apple.com/content/downloads/04/13/052-77516-A_4P7VY083DT/83qy3989rsnylxagdmim3owwjdtc33zfe4/InstallAssistant.pkg'
-          pkgutil --check-signature "$RUNNER_TEMP/InstallAssistant.pkg" | tee "$RUNNER_TEMP/signature.txt"
-          grep -q 'Software Update' "$RUNNER_TEMP/signature.txt"
-          grep -q 'Apple Root CA' "$RUNNER_TEMP/signature.txt"
-      - name: Extract installer application
+          sudo softwareupdate --fetch-full-installer --full-installer-version 14.4.1
+
+      - name: Verify the requested installer
         shell: bash
         run: |
           set -euo pipefail
-          sudo installer -pkg "$RUNNER_TEMP/InstallAssistant.pkg" -target /
-          test -x '/Applications/Install macOS Sonoma.app/Contents/Resources/createinstallmedia'
-          rm "$RUNNER_TEMP/InstallAssistant.pkg"
-      - name: Package ZIP preserving application metadata
+          APP='/Applications/Install macOS Sonoma.app'
+          test -x "$APP/Contents/Resources/createinstallmedia"
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          test "$VERSION" = '14.4.1'
+          echo "Verified macOS Sonoma $VERSION (23E224)"
+
+      - name: Create ZIP and split it into artifact-sized parts
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/output"
-          ditto -c -k --sequesterRsrc --keepParent '/Applications/Install macOS Sonoma.app' "$RUNNER_TEMP/output/macOS-Sonoma-14.4.1-23E224.zip"
-          cd "$RUNNER_TEMP/output"
-          shasum -a 256 macOS-Sonoma-14.4.1-23E224.zip > SHA256SUMS.txt
-      - name: Upload installer ZIP
+          APP='/Applications/Install macOS Sonoma.app'
+          ARCHIVE="$RUNNER_TEMP/Install-macOS-Sonoma-14.4.1-23E224.zip"
+          PARTS="$RUNNER_TEMP/parts"
+          mkdir -p "$PARTS"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
+          shasum -a 256 "$ARCHIVE" > "$PARTS/SHA256.txt"
+          split -b 1900m -d -a 2 "$ARCHIVE" "$PARTS/Install-macOS-Sonoma-14.4.1-23E224.zip.part-"
+          printf '%s\n' \
+            'Download every ZIP-part artifact and extract each one.' \
+            'Place all .part-* files and SHA256.txt in one folder, then run:' \
+            'cat Install-macOS-Sonoma-14.4.1-23E224.zip.part-* > Install-macOS-Sonoma-14.4.1-23E224.zip' \
+            'shasum -a 256 -c SHA256.txt' \
+            > "$PARTS/README.txt"
+
+      - name: Upload instructions
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-Sonoma-14.4.1-23E224-ZIP
-          path: ${{ runner.temp }}/output/*
+          name: Sonoma-14.4.1-23E224-ZIP-instructions
+          path: |
+            ${{ runner.temp }}/parts/README.txt
+            ${{ runner.temp }}/parts/SHA256.txt
           compression-level: 0
-          retention-days: 3
-          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload ZIP part 00
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-00
+          path: ${{ runner.temp }}/parts/*.part-00
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-01
+          path: ${{ runner.temp }}/parts/*.part-01
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-02
+          path: ${{ runner.temp }}/parts/*.part-02
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-03
+          path: ${{ runner.temp }}/parts/*.part-03
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 04
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-04
+          path: ${{ runner.temp }}/parts/*.part-04
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 05
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-05
+          path: ${{ runner.temp }}/parts/*.part-05
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 06
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-06
+          path: ${{ runner.temp }}/parts/*.part-06
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload ZIP part 07
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonoma-14.4.1-23E224-ZIP-part-07
+          path: ${{ runner.temp }}/parts/*.part-07
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 1
